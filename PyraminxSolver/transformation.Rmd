@@ -1,0 +1,323 @@
+---
+title: "CubeDrawing.Rmd"
+output: html_document
+date: '2022-09-23'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+setwd("C:\\Users\\sojba\\Source\\Repos\\PyraminxSolver\\PyraminxSolver")
+```
+```{r}
+source('transformation.R')
+pyra = pyranomix("dddddddddffffffffflllllllllrrrrrrrrr");
+#drawPyra(cube)
+#ucube = rotate(cube,"U"); drawPyra(ucube);
+```
+```{r}
+triangleWithLabel<-function(p0,p1,p2,col="",label="") {
+  x=c(p0[1],p1[1],p2[1]);
+  y=c(p0[2],p1[2],p2[2]);
+  polygon(x,y,col=col); #3
+  cx=mean(x);
+  cy=mean(y);
+  text(cx,cy,label,cex=0.5);
+}
+
+drawFace<-function(cx,cy,h,trans,faces,labels) {
+  colr = sapply(faces, function(x) colordic[[x]])
+  op0 = c(cx,cy);
+  op3 = c(cx+h,cy);
+  op9 = c(cx+0.5*h, cy + h);
+  lout = trans(op0,op3,op9);
+  p0=lout[[1]];
+  p3=lout[[2]];
+  p9=lout[[3]];
+  
+  p1 = (2/3)*p0 + (1/3)*p3;
+  p2 = (1/3)*p0 + (2/3)*p3;
+  p4 = (2/3)*p0 + (1/3)*p9;
+  p7 = (1/3)*p0 + (2/3)*p9;
+  p8 = (2/3)*p9 + (1/3)*p3;
+  p6 = (1/3)*p9 + (2/3)*p3;
+  p5 = (1/2)*p2 + (1/2)*p7;
+  triangleWithLabel(p0,p1,p4,col=colr[1],label=labels[1]);
+  triangleWithLabel(p1,p4,p5,col=colr[2],label=labels[2]);
+  triangleWithLabel(p1,p5,p2,col=colr[3],label=labels[3]);
+  triangleWithLabel(p5,p2,p6,col=colr[4],label=labels[4]);
+  triangleWithLabel(p2,p6,p3,col=colr[5],label=labels[5]);
+  triangleWithLabel(p4,p5,p7,col=colr[6],label=labels[6]);
+  triangleWithLabel(p5,p7,p8,col=colr[7],label=labels[7]);
+  triangleWithLabel(p5,p8,p6,col=colr[8],label=labels[8]);
+  triangleWithLabel(p7,p8,p9,col=colr[9],label=labels[9]);
+}
+
+trans1 <- function(p0,p3,p9) {
+  #np0 = p0 + cc*(p3-p0)+cc*(p9-p0);
+  np0 = p0/4 + p3/2 + p9/4;
+  np3 = p3;
+  np9 = p9;
+  list(np0,np3,np9);
+}
+
+trans2 <- function(p0,p3,p9) {
+  np0 = p0;
+  np3 = p3;
+  np9 = p0/4 + p3/2 + p9/4;
+  list(np0,np3,np9);
+}
+
+trans3 <- function(p0,p3,p9) {
+  np0 = p0;
+  np3 = p0/4 + p3/2 + p9/4;
+  np9 = p9;
+  list(np0,np3,np9);
+}
+
+
+```
+
+```{r}
+drawPyra<-function(pyra,label="") {
+  rightfaces = pyra[c(31,30,34,33,35,29,28,32,27)+1];
+  frontfaces = pyra[c(9:17)+1];
+  downfaces = pyra[c(4,3,7,6,8,2,1,5,0)+1];
+
+  plot(c(-0.3,1.3),c(0,1.05), type="n",ylab="", xaxt='n', yaxt='n',ann=FALSE);
+  drawFace(0,0,1,trans1,rightfaces,labels=c(31,30,34,33,35,29,28,32,27));
+  drawFace(0,0,1,trans3,frontfaces,labels=c(9:17));
+  drawFace(0,0,1,trans2,downfaces,labels=c(4,3,7,6,8,2,1,5,0));  
+  text(0.2,1,label)
+}
+
+#0 1 2  3 4 5 6 7 8
+#4 3 2  1 0 7 6 5 8  
+drawPyra(pyra,"Pyraminx");
+```
+
+
+```{r}
+upyra = rotate(pyra,"D"); drawPyra(upyra,label="D");
+rpyra = rotate(pyra,"R"); drawPyra(rpyra,label="R");
+lpyra = rotate(pyra,"L"); drawPyra(lpyra,label="L");
+fpyra = rotate(pyra,"F"); drawPyra(fpyra,label="F");
+```
+
+```{r}
+pyrat0 = rotate(pyra,"l"); drawPyra(pyrat0,label="l");
+pyrat9 = rotate(pyra,"b"); drawPyra(pyrat9,label="b");
+pyrat13 = rotate(pyra,"r"); drawPyra(pyrat13,label="r");
+pyrat17 = rotate(pyra,"u"); drawPyra(pyrat17,label="u");
+```
+
+```{r}
+set.seed(5);
+res=shuffle_pyra(pyra,n=20);
+shuffled =res$pyra;
+
+print_rotation_list <- function(rots) {
+  cat("new string[] {",paste(paste0('"',res$rots,'"'),collapse=","),"}")
+}
+
+print_rotation_list(res$rots);
+drawPyra(shuffled, label="shuffled (n=20)");
+```
+# Step 1. Solve the corner piece
+In this step, you need to make the small tips on every facet same as its center pieces.
+
+1. Rotate the tips and make it same color as its center pieces.
+2. Rotate the bigger tip and make tips on every facet same color as its center pieces.
+
+```{r}
+sol="";
+source('transformation.R');
+matchSmallTip<-function(pyra,tipname) {
+  tipNo = list("b"=18,"l"=9,"r"=0,"u"=27);
+  tipnamereverse = paste0(tipname,"'");
+  center = tip2center[[tipname]];
+  tipTurned=pyra[tble[tipname,tipNo[[tipname]]+1]+1];
+  tipTurnedReverse=pyra[tble[tipnamereverse,tipNo[[tipname]]+1]+1];
+  if (tipTurned==pyra[center+1]) {
+    npyra = rotate(pyra, tipname);
+    sol<<-paste(sol,tipname,collapse=" ");
+  } else if (tipTurnedReverse == pyra[center+1]) {
+    npyra = rotate(pyra, tipnamereverse);
+    sol<<-paste(sol,tipnamereverse,collapse=" ");
+  } else {
+    npyra = pyra;
+  }
+  return(npyra);
+}
+```
+
+```{r}
+drawPyra(shuffled)
+pyra1 = matchSmallTip(shuffled, "l");
+drawPyra(pyra1, label="l is fixed.");
+pyra2 = matchSmallTip(pyra1, "b");
+drawPyra(pyra2, label="b is fixed.");
+pyra3 = matchSmallTip(pyra2, "u");
+drawPyra(pyra3, label="u is fixed.");
+pyra4 = matchSmallTip(pyra3, "r");
+drawPyra(pyra4, label="r is fixed.");
+sol
+```
+
+```{r}
+matchSmallTips <- function(pyra) {
+  spyra = matchSmallTip(pyra, "l");
+  spyra = matchSmallTip(spyra, "r");
+  spyra = matchSmallTip(spyra, "u");
+  spyra = matchSmallTip(spyra, "b");
+  spyra;
+}
+
+```
+
+```{r}
+matchLargeTip<-function(pyra,tipname) {
+  #tipNo = list("L"=1,"R"=12,"F"=10,"U"=15);
+  tipNo = list("F"=19,"R"=10,"L"=12,"D"=15)
+  tipColor = list("F"='l', "R"='f', "L"='f',"D"='f');
+  tipnamereverse = paste0(tipname,"'");
+  tipcolor = tipColor[[tipname]];
+  tipTurned=pyra[tble[tipname,tipNo[[tipname]]+1]+1];
+  tipTurnedReverse=pyra[tble[tipnamereverse,tipNo[[tipname]]+1]+1];
+  if (tipTurned==tipcolor) {
+    npyra = rotate(pyra, tipname);
+    sol<<-paste(sol,tipname,collapse=" ");
+  } else if (tipTurnedReverse == tipcolor) {
+    npyra = rotate(pyra, tipnamereverse);
+    sol<<-paste(sol,tipnamereverse,collapse=" ");
+  } else {
+    npyra = pyra;
+  }
+  return(npyra);
+}
+```
+
+
+```{r}
+drawPyra(pyra4)
+pyras = matchLargeTip(pyra4, "R");
+drawPyra(pyras, label="R is fixed.");
+pyras = matchLargeTip(pyras, "D");
+drawPyra(pyras, label="D is fixed.");
+pyras = matchLargeTip(pyras, "L");
+drawPyra(pyras, label="L is fixed.");
+pyras = matchLargeTip(pyras, "F");
+drawPyra(pyras, label="F is fixed.");
+sol
+```
+
+```{r}
+matchLargeTips <- function(pyra) {
+  spyra = matchLargeTip(pyra, "L");
+  spyra = matchLargeTip(spyra, "R");
+  spyra = matchLargeTip(spyra, "D");
+  spyra = matchLargeTip(spyra, "F");
+  spyra;
+}
+
+sol="";
+spyra <- matchSmallTips(shuffled); drawPyra(spyra, "Tips are rotated to the corresponding center pieces.");
+spyra <- matchLargeTips(spyra); drawPyra(spyra, "The bigger tips are rotated to mkae tips on every facet same color as its center pieces.");
+sol;
+```
+
+
+```{r}
+
+BFS<-function(start, end)
+{
+    pyras=list();
+    parentArray = c();
+    rotHistory = c();
+        # Create a queue for BFS
+
+    
+    #rots = c("R","L","F","R'","L'","F'");
+    rots = list("start"=c("R","L","F","R'","L'","F'"),
+                "D"=c("R","L","F","R'","L'","F'"),
+                "D'"=c("R","L","F","R'","L'","F'"),
+                "R"=c("D","L","F","D'","L'","F'"),
+                "R'"=c("D","L","F","D'","L'","F'"),
+                "F"=c("D","R","L","D'","R'","L'"),
+                "F'"=c("D","R","L","D'","R'","L'"),
+                "L"=c("D","R","F","D'","R'","F'"),
+                "L'"=c("D","R","F","D'","R'","F'"));
+    lastcommand = "start";
+    pyras = append(pyras,list(start));
+    parentArray = append(parentArray,1);
+    rotHistory = append(rotHistory, "U"); # // 0
+    queueindex = 1;
+    numRejected = 0;
+    total = 0;
+    cat(paste0(queueindex , ":" , paste0(start,collapse=""),"\n"));
+    while (queueindex <= length(pyras))
+    {
+        s = pyras[[queueindex]];
+        for (rot in rots[[lastcommand]])
+        {
+            newpyra = rotate(s, rot);
+            total = total + 1;
+            if (!(list(newpyra) %in% pyras)) 
+            {
+                  pyras = append(pyras,list(newpyra)); 
+                  parentArray = append(parentArray,queueindex);
+                  rotHistory = append(rotHistory, rot);
+            } else {
+                    numRejected = numRejected+1;
+            }
+            if (all(newpyra == end))
+            {
+                    cat("Problem solved!\n");
+                    parent = length(pyras);
+                    solution=c();
+                    while (parent > 1)
+                    {
+                        cat(paste0(parent, ":" ,paste0(pyras[[parent]], collapse="")));
+                        cat(paste0("<---", rotHistory[parent], "---\n"));
+                        solution=append(solution, rotHistory[parent], after=0 );
+                        parent = parentArray[parent];
+                    }
+                    cat(paste0(parent, ":" , paste0(pyras[[parent]], collapse="")));
+                    cat(paste0("Total Trial=",total ," numRejected=", numRejected,"\n"));
+                    sol <<- paste(sol, paste(solution, collapse=" "));
+                  return();
+            }
+        }
+        lastcommand = rotHistory[queueindex];
+        queueindex = queueindex+1;
+    }
+}
+
+```
+
+```{r}
+BFS(spyra,pyra)
+
+```
+
+```{r}
+sol
+```
+
+```{r}
+set.seed(4);
+sol="";
+shuffled=shuffle_pyra(pyra,n=20);
+drawPyra(shuffled, label="before");
+
+```
+
+```{r}
+spyra <- matchSmallTips(shuffled); drawPyra(spyra, "Tips are rotated to the corresponding center pieces.");
+spyra <- matchLargeTips(spyra); drawPyra(spyra, "The bigger tips are rotated to mkae tips on every facet same color as its center pieces.");
+BFS(spyra,pyra);
+solved<-multirot(shuffled, sol);
+drawPyra(solved, label="after");
+```
